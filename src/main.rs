@@ -1,7 +1,7 @@
 use std::{fs, io::Read};
 
 use clap::Parser;
-/// Simple program to greet a person
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -11,13 +11,17 @@ struct Args {
     /// Block size on which calculate entropy. Zero = all file
     #[arg(short, long, default_value_t = 0)]
     block: usize,
+
+    /// Use percentage
+    #[arg(short, long, default_value = "false")]
+    percent: bool,
 }
 fn entropy(v: &[u64; 256], num_bytes: f32) -> f32 {
     v.iter()
         .filter(|u| **u != 0)
         .map(|u| *u as f32 / num_bytes)
         .map(|u| -1.0 * u * f32::log2(u))
-        .sum()
+        .sum::<f32>()
 }
 fn main() {
     let mut v: [u64; 256] = [0; 256];
@@ -45,7 +49,11 @@ fn main() {
             }
         }
         let entropy: f32 = entropy(&v, num_bytes as f32);
-        println!("From 0 to {num_bytes} byte entropy {entropy}");
+        if args.percent {
+            println!("From 0 to {num_bytes} byte entropy {:.5} %", entropy / 8.0);
+        } else {
+            println!("From 0 to {num_bytes} byte entropy {entropy}");
+        }
     } else {
         let mut block_number = 0;
         let mut current_byte = 0;
@@ -57,10 +65,9 @@ fn main() {
                     current_byte += 1;
                     if current_byte == args.block {
                         let entropy: f32 = entropy(&v, current_byte as f32);
-                        println!("Block number {block_number}, entropy {entropy}");
+                        print_block(args.percent, entropy, block_number);
                         // reset the state
-                        v.iter_mut().for_each(|e| *e = 0);
-                        //v = [0; 256];
+                        v = [0; 256];
                         block_number += 1;
                         current_byte = 0;
                     }
@@ -68,11 +75,22 @@ fn main() {
                 Err(_) => {
                     if current_byte > 0 {
                         let entropy: f32 = entropy(&v, current_byte as f32);
-                        println!("Block number {block_number}, entropy {entropy}");
+                        print_block(args.percent, entropy, block_number);
                     }
                     break;
                 }
             }
         }
+    }
+}
+
+fn print_block(percent: bool, entropy: f32, block_number: usize) {
+    if percent {
+        println!(
+            "Block number {block_number}, entropy {:.5} %",
+            entropy / 8.0
+        );
+    } else {
+        println!("Block number {block_number}, entropy {entropy:.5}");
     }
 }
